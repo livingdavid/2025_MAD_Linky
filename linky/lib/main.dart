@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'linkView.dart';
+import 'modals/deleteFolder.dart';
+import 'modals/linkDelete.dart';
+import 'modals/addTag.dart';
+import 'modals/updateFolder.dart';
+import 'modals/createFolder.dart';
 
 void main() {
   runApp(const MyApp());
@@ -86,22 +92,7 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text(widget.title),
       ),
       body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             const Text('You have pushed the button this many times:'),
@@ -109,9 +100,44 @@ class _MyHomePageState extends State<MyHomePage> {
               '$_counter',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
+            ElevatedButton(
+              onPressed: () => _showModal(context, const DeleteFolderModal()),
+              child: const Text('폴더 삭제 모달'),
+            ),
+            ElevatedButton(
+              onPressed: () => _showModal(context, const LinkDeleteModal()),
+              child: const Text('링크 삭제 모달'),
+            ),
+            ElevatedButton(
+              onPressed: () => _showModal(context, const AddTagModal()),
+              child: const Text('태그 추가 모달'),
+            ),
+            ElevatedButton(
+              onPressed: () => _showModal(context, const UpdateFolderModal()),
+              child: const Text('폴더명 변경 모달'),
+            ),
+            ElevatedButton(
+              onPressed: () => _showModal(context, const CreateFolderModal()),
+              child: const Text('폴더 생성 모달'),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const LinkViewPage(
+                      link: 'https://m.sports.naver.com/kbaseball/index',
+                    ),
+                  ),
+                );
+              },
+              child: const Text('링크 페이지로 이동'),
+            ),
           ],
         ),
       ),
+
       floatingActionButton: FloatingActionButton(
         onPressed: _incrementCounter,
         tooltip: 'Increment',
@@ -119,4 +145,18 @@ class _MyHomePageState extends State<MyHomePage> {
       ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
+}
+
+void _showModal(BuildContext context, Widget child) {
+  showDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierColor: Colors.black.withOpacity(0.4),
+    builder: (_) => Center(
+      child: Material(
+        color: Colors.transparent,
+        child: child,
+      ),
+    ),
+  );
 }
