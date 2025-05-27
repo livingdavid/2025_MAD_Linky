@@ -18,7 +18,10 @@ class AddTagModal extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('태그 추가', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text(
+                  '태그 추가',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
                 IconButton(
                   icon: const Icon(Icons.close),
                   onPressed: () => Navigator.pop(context),
@@ -38,7 +41,10 @@ class AddTagModal extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: TextButton(
                 onPressed: () {},
-                child: const Text('추가 완료', style: TextStyle(color: Colors.green)),
+                child: const Text(
+                  '추가 완료',
+                  style: TextStyle(color: Colors.green),
+                ),
               ),
             ),
           ],

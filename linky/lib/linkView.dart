@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'linkUpdate.dart';
+import 'linkUpload.dart';
+import 'modals/deleteFolder.dart';
 
 class LinkViewPage extends StatelessWidget {
   final String link;
@@ -55,29 +58,65 @@ class LinkViewPage extends StatelessWidget {
                     child: Stack(
                       children: [
                         Padding(
-                          padding: const EdgeInsets.only(top: 5.0, left: 16, right: 16),
+                          padding: const EdgeInsets.only(
+                            top: 5.0,
+                            left: 16,
+                            right: 16,
+                          ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+                                icon: const Icon(
+                                  Icons.arrow_back_ios,
+                                  color: Colors.white,
+                                ),
                                 onPressed: () => Navigator.pop(context),
                               ),
                               PopupMenuButton<String>(
-                                icon: const Icon(Icons.more_horiz, color: Colors.white),
+                                icon: const Icon(
+                                  Icons.more_horiz,
+                                  color: Colors.white,
+                                ),
                                 color: Colors.white,
                                 position: PopupMenuPosition.under,
-                                onSelected: (value) {},
-                                itemBuilder: (context) => [
-                                  const PopupMenuItem(
-                                    value: 'edit',
-                                    child: Text('링크 수정'),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    child: Text('링크 삭제', style: TextStyle(color: Colors.red)),
-                                  ),
-                                ],
+                                onSelected: (value) {
+                                  if (value == 'edit') {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder:
+                                            (_) => LinkUpdatePage(link: link),
+                                      ),
+                                    );
+                                  } else if (value == 'delete') {
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: true,
+                                      builder:
+                                          (_) => DeleteFolderModal(
+                                            onDelete: () {
+                                              Navigator.pop(context);
+                                              Navigator.pop(context);
+                                            },
+                                          ),
+                                    );
+                                  }
+                                },
+                                itemBuilder:
+                                    (context) => [
+                                      const PopupMenuItem(
+                                        value: 'edit',
+                                        child: Text('링크 수정'),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        child: Text(
+                                          '링크 삭제',
+                                          style: TextStyle(color: Colors.red),
+                                        ),
+                                      ),
+                                    ],
                               ),
                             ],
                           ),
@@ -96,11 +135,18 @@ class LinkViewPage extends StatelessWidget {
                               const SizedBox(height: 10),
                               const Text(
                                 '네이버 스포츠 야구',
-                                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                               Text(
                                 '${uploadDate.year}.${uploadDate.month.toString().padLeft(2, '0')}.${uploadDate.day.toString().padLeft(2, '0')}',
-                                style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
                               ),
                             ],
                           ),
@@ -109,7 +155,10 @@ class LinkViewPage extends StatelessWidget {
                           right: 16,
                           bottom: 16,
                           child: IconButton(
-                            icon: const Icon(Icons.ios_share, color: Colors.white),
+                            icon: const Icon(
+                              Icons.ios_share,
+                              color: Colors.white,
+                            ),
                             onPressed: () => _shareLink(context),
                           ),
                         ),
@@ -129,16 +178,28 @@ class LinkViewPage extends StatelessWidget {
                   topRight: Radius.circular(20),
                 ),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 20,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('폴더', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text(
+                    '폴더',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 4),
-                  const Chip(label: Text('스포츠'), backgroundColor: Color(0xFFF0F0F0)),
+                  const Chip(
+                    label: Text('스포츠'),
+                    backgroundColor: Color(0xFFF0F0F0),
+                  ),
                   const SizedBox(height: 16),
 
-                  const Text('링크', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text(
+                    '링크',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 4),
                   Container(
                     width: double.infinity,
@@ -151,19 +212,34 @@ class LinkViewPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  const Text('태그', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text(
+                    '태그',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 4),
                   Wrap(
                     spacing: 8,
                     children: const [
-                      Chip(label: Text('야구'), backgroundColor: Color(0xFFF0F0F0)),
-                      Chip(label: Text('한화'), backgroundColor: Color(0xFFF0F0F0)),
-                      Chip(label: Text('가을야구'), backgroundColor: Color(0xFFF0F0F0)),
+                      Chip(
+                        label: Text('야구'),
+                        backgroundColor: Color(0xFFF0F0F0),
+                      ),
+                      Chip(
+                        label: Text('한화'),
+                        backgroundColor: Color(0xFFF0F0F0),
+                      ),
+                      Chip(
+                        label: Text('가을야구'),
+                        backgroundColor: Color(0xFFF0F0F0),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
 
-                  const Text('메모', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text(
+                    '메모',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 4),
                   Container(
                     width: double.infinity,

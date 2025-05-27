@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 class DeleteFolderModal extends StatelessWidget {
-  const DeleteFolderModal({super.key});
+  final VoidCallback onDelete;
+  const DeleteFolderModal({super.key, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +24,7 @@ class DeleteFolderModal extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.close),
                   onPressed: () => Navigator.pop(context),
-                )
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -37,7 +38,9 @@ class DeleteFolderModal extends StatelessWidget {
               onPressed: () {},
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.redAccent,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               child: const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
