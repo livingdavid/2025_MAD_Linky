@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 class CreateFolderModal extends StatelessWidget {
-  const CreateFolderModal({super.key});
+  final void Function(String) onCreate;
+
+  const CreateFolderModal({super.key, required this.onCreate});
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +20,10 @@ class CreateFolderModal extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('폴더명 생성', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text(
+                  '폴더명 생성',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
                 IconButton(
                   icon: const Icon(Icons.close),
                   onPressed: () => Navigator.pop(context),
@@ -37,8 +42,17 @@ class CreateFolderModal extends StatelessWidget {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-                onPressed: () {},
-                child: const Text('생성 완료', style: TextStyle(color: Colors.green)),
+                onPressed: () {
+                  final folderName = controller.text.trim();
+                  if (folderName.isNotEmpty) {
+                    onCreate(folderName);
+                    Navigator.pop(context);
+                  }
+                },
+                child: const Text(
+                  '생성 완료',
+                  style: TextStyle(color: Colors.green),
+                ),
               ),
             ),
           ],
