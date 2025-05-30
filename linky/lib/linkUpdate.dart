@@ -121,8 +121,8 @@ class _LinkUpdatePageState extends State<LinkUpdatePage> {
     final newLinkDoc = await newFolderRef.collection('links').add({
       ...oldData.data()!,
       'lastAddedUrl': linkController.text.trim(),
-      'lastMemo': memoController.text.trim(),
-      'lastTags': tags,
+      'memo': memoController.text.trim(),
+      'tags': tags,
       'updatedAt': FieldValue.serverTimestamp(),
     });
 
