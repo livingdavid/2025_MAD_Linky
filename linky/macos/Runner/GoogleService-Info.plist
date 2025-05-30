@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>1087183332010-f42n5b8lbdkdsaag79dcq7hci3buerku.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.1087183332010-f42n5b8lbdkdsaag79dcq7hci3buerku</string>
+	<key>API_KEY</key>
+	<string>AIzaSyD2vsxU_vgTxiYLLfSCYikb8BJBZy3VwBg</string>
+	<key>GCM_SENDER_ID</key>
+	<string>1087183332010</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.example.linky</string>
+	<key>PROJECT_ID</key>
+	<string>linky-2025</string>
+	<key>STORAGE_BUCKET</key>
+	<string>linky-2025.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:1087183332010:ios:bfe6e10ddc800feb1ae6d3</string>
+</dict>
+</plist>

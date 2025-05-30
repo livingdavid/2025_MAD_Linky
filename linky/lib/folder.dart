@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'linkView.dart';
 import 'linkUpload.dart';
-import 'modals/updateFolder.dart';
-import 'modals/deleteFolder.dart';
 
 class FolderPage extends StatefulWidget {
   final String initialFolder;
-  final Map<String, List<Map<String, String>>> folderData;
+  final Map<String, List<Map<String, dynamic>>> folderData;
 
   const FolderPage({
     super.key,
@@ -20,6 +21,7 @@ class FolderPage extends StatefulWidget {
 class _FolderPageState extends State<FolderPage> {
   late String selectedFolder;
   late List<String> folderList;
+  late Map<String, List<Map<String, dynamic>>> folderData;
   String searchQuery = '';
 
   @override
@@ -27,148 +29,122 @@ class _FolderPageState extends State<FolderPage> {
     super.initState();
     selectedFolder = widget.initialFolder;
     folderList = widget.folderData.keys.toList();
+    folderData = widget.folderData;
   }
 
-  void _showUpdateFolderModal() {
-    showDialog(
-      context: context,
-      builder:
-          (_) => UpdateFolderModal(
-            folderName: selectedFolder,
-            onUpdate: (newName) {
-              setState(() {
-                final links = widget.folderData.remove(selectedFolder)!;
-                widget.folderData[newName] = links;
-                folderList = widget.folderData.keys.toList();
-                selectedFolder = newName;
-              });
-            },
-          ),
-    );
-  }
+  Future<void> _loadLinks() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
 
-  void _showDeleteFolderModal() {
-    showDialog(
-      context: context,
-      builder:
-          (_) => DeleteFolderModal(
-            onDelete: () {
-              setState(() {
-                widget.folderData.remove(selectedFolder);
-                folderList = widget.folderData.keys.toList();
-                selectedFolder = folderList.isNotEmpty ? folderList[0] : '';
-              });
-              Navigator.pop(context);
-            },
-          ),
-    );
+    final snapshot =
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('folders')
+            .doc(selectedFolder)
+            .collection('links')
+            .orderBy('createdAt', descending: true)
+            .get();
+
+    final links =
+        snapshot.docs.map((doc) {
+          final data = doc.data();
+          return {
+            'url': data['url'] ?? '',
+            'title': data['title'] ?? '',
+            'memo': data['memo'] ?? '',
+            'tags': (data['tags'] as List<dynamic>?)?.join(',') ?? '',
+            'createdAt': data['createdAt'] ?? Timestamp.now(),
+            'docId': doc.id,
+          };
+        }).toList();
+
+    setState(() {
+      folderData[selectedFolder] = links;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final links = widget.folderData[selectedFolder] ?? [];
+    final links = folderData[selectedFolder] ?? [];
     final filteredLinks =
         links.where((link) {
-          final title = link['title']?.toLowerCase() ?? '';
-          final content = link['content']?.toLowerCase() ?? '';
+          final title = (link['title'] ?? '').toString().toLowerCase();
+          final memo = (link['memo'] ?? '').toString().toLowerCase();
           final query = searchQuery.toLowerCase();
-          return title.contains(query) || content.contains(query);
+          return title.contains(query) || memo.contains(query);
         }).toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(selectedFolder),
+        title: const Text(''),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new),
+          onPressed: () => Navigator.pop(context, true),
+        ),
         actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_horiz, color: Colors.black),
-            onSelected: (value) {
-              if (value == 'rename') {
-                showDialog(
-                  context: context,
-                  builder:
-                      (_) => UpdateFolderModal(
-                        folderName: selectedFolder,
-                        onUpdate: (newName) {
-                          setState(() {
-                            final oldIndex = folderList.indexOf(selectedFolder);
-
-                            folderList[oldIndex] = newName;
-
-                            final links = widget.folderData.remove(
-                              selectedFolder,
-                            );
-                            if (links != null) {
-                              widget.folderData[newName] = links;
-                            }
-
-                            selectedFolder = newName;
-                          });
-                        },
-                      ),
-                );
-              } else if (value == 'delete') {}
-            },
-            itemBuilder:
-                (_) => const [
-                  PopupMenuItem(value: 'rename', child: Text('폴더명 변경')),
-                  PopupMenuItem(
-                    value: 'delete',
-                    child: Text('폴더 삭제', style: TextStyle(color: Colors.red)),
-                  ),
-                ],
-          ),
+          IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '링크 ${filteredLinks.length}개',
-              style: const TextStyle(fontSize: 14, color: Colors.grey),
+              selectedFolder,
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 4),
+            Text(
+              '링크 ${links.length}개',
+              style: const TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+            const SizedBox(height: 20),
+
             TextField(
               onChanged: (value) => setState(() => searchQuery = value),
               decoration: InputDecoration(
                 hintText: '검색어를 입력하세요',
-                filled: true,
-                fillColor: const Color(0xFFF0F0F0),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
                 prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.grey[200],
+                border: OutlineInputBorder(
+                  borderSide: BorderSide.none,
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
             const SizedBox(height: 16),
+
             SizedBox(
               height: 40,
-              child: ListView.separated(
+              child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: folderList.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (context, index) {
                   final folderName = folderList[index];
                   final isSelected = selectedFolder == folderName;
                   return GestureDetector(
                     onTap: () => setState(() => selectedFolder = folderName),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
+                      margin: const EdgeInsets.symmetric(horizontal: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
                       decoration: BoxDecoration(
-                        color:
-                            isSelected ? Colors.green : const Color(0xFFF0F0F0),
-                        borderRadius: BorderRadius.circular(20),
+                        border: Border(
+                          bottom: BorderSide(
+                            color:
+                                isSelected ? Colors.green : Colors.transparent,
+                            width: 3,
+                          ),
+                        ),
                       ),
                       child: Text(
                         folderName,
                         style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.black,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
+                          color: isSelected ? Colors.green : Colors.grey,
                         ),
                       ),
                     ),
@@ -177,132 +153,140 @@ class _FolderPageState extends State<FolderPage> {
               ),
             ),
             const SizedBox(height: 16),
+
             Expanded(
-              child: ListView.builder(
-                itemCount: filteredLinks.length,
-                itemBuilder: (context, index) {
-                  final link = filteredLinks[index];
-                  return Dismissible(
-                    key: Key(link['title'] ?? index.toString()),
-                    background: Container(
-                      padding: const EdgeInsets.only(left: 20),
-                      alignment: Alignment.centerLeft,
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.push_pin, color: Colors.white),
-                    ),
-                    secondaryBackground: Container(
-                      padding: const EdgeInsets.only(right: 20),
-                      alignment: Alignment.centerRight,
-                      decoration: BoxDecoration(
-                        color: Colors.redAccent,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.delete, color: Colors.white),
-                    ),
-                    confirmDismiss: (direction) async {
-                      if (direction == DismissDirection.endToStart) {
-                        final confirmed = await showDialog(
-                          context: context,
-                          builder:
-                              (_) => AlertDialog(
-                                title: const Text('삭제 확인'),
-                                content: const Text('정말로 이 링크를 삭제하시겠습니까?'),
-                                actions: [
-                                  TextButton(
-                                    onPressed:
-                                        () => Navigator.of(context).pop(false),
-                                    child: const Text('취소'),
-                                  ),
-                                  TextButton(
-                                    onPressed:
-                                        () => Navigator.of(context).pop(true),
-                                    child: const Text(
-                                      '삭제',
-                                      style: TextStyle(color: Colors.red),
-                                    ),
+              child:
+                  filteredLinks.isEmpty
+                      ? const Center(child: Text('일치하는 링크가 없습니다.'))
+                      : ListView.builder(
+                        itemCount: filteredLinks.length,
+                        itemBuilder: (context, index) {
+                          final link = filteredLinks[index];
+                          final tagList =
+                              (link['tags'] ?? '')
+                                  .toString()
+                                  .split(',')
+                                  .map((e) => e.trim())
+                                  .where((e) => e.isNotEmpty)
+                                  .toList();
+
+                          return GestureDetector(
+                            onTap: () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder:
+                                      (_) => LinkViewPage(
+                                        linkData: {
+                                          'lastAddedUrl': link['url'] ?? '',
+                                          'lastTags': tagList,
+                                          'lastMemo': link['memo'] ?? '',
+                                          'createdAt':
+                                              link['createdAt'] ??
+                                              Timestamp.now(),
+                                          'name': selectedFolder,
+                                          'docId': link['docId'] ?? '',
+                                        },
+                                      ),
+                                ),
+                              );
+                              if (result == true) {
+                                await _loadLinks();
+                              }
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 16),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
                                   ),
                                 ],
                               ),
-                        );
-                        if (confirmed) {
-                          setState(() {
-                            widget.folderData[selectedFolder]?.removeAt(index);
-                          });
-                        }
-                        return confirmed;
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('고정되었습니다.')),
-                        );
-                        return false;
-                      }
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8F8F8),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            link['title'] ?? '',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            link['content'] ?? '',
-                            style: const TextStyle(color: Colors.grey),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            children:
-                                (link['tags']?.split(',') ?? [])
-                                    .map(
-                                      (tag) => Chip(
-                                        label: Text(tag),
-                                        backgroundColor: const Color(
-                                          0xFFE0E0E0,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Image.network(
+                                        'https://www.google.com/s2/favicons?sz=64&domain_url=${link['url'] ?? ''}',
+                                        width: 20,
+                                        height: 20,
+                                        errorBuilder:
+                                            (_, __, ___) =>
+                                                const Icon(Icons.link),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        Uri.parse(link['url'] ?? '').host,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.green,
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                    )
-                                    .toList(),
-                          ),
-                        ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    link['title'] ?? '',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    link['memo'] ?? '',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  if (tagList.isNotEmpty)
+                                    Wrap(
+                                      spacing: 8,
+                                      children:
+                                          tagList.map((tag) {
+                                            return Chip(
+                                              label: Text(tag),
+                                              backgroundColor: const Color(
+                                                0xFFF0F0F0,
+                                              ),
+                                            );
+                                          }).toList(),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.bottomRight,
-              child: FloatingActionButton.extended(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const LinkUploadPage()),
-                  );
-                },
-                backgroundColor: Colors.green,
-                label: const Text('업로드'),
-                icon: const Icon(Icons.add),
-              ),
             ),
           ],
         ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const LinkUploadPage()),
+          );
+          if (result == true) {
+            await _loadLinks(); // 🔄 업로드 후 새로고침
+            Navigator.pop(context, true); // ✅ HomePage로 true 반환
+          }
+        },
+        label: const Text('+ 업로드'),
+        backgroundColor: Colors.green,
       ),
     );
   }

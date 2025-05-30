@@ -1,22 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'modals/addTag.dart';
 import 'modals/createFolder.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LinkUpdatePage extends StatefulWidget {
-  final String link;
-  const LinkUpdatePage({super.key, required this.link});
+  final Map<String, dynamic> linkData;
+  const LinkUpdatePage({super.key, required this.linkData});
 
   @override
   State<LinkUpdatePage> createState() => _LinkUpdatePageState();
 }
 
 class _LinkUpdatePageState extends State<LinkUpdatePage> {
-  String selectedFolder = '취업준비';
-  List<String> folderList = ['김지원', '지석영', '이민규'];
-  List<String> tags = ['태그1', '태그2', '태그3'];
-  TextEditingController memoController = TextEditingController();
+  late TextEditingController memoController;
+  late TextEditingController linkController;
+  late List<String> tags;
+  late String selectedFolder;
+  List<String> folderList = [];
+
+  @override
+  void initState() {
+    super.initState();
+    linkController = TextEditingController(
+      text: widget.linkData['lastAddedUrl'],
+    );
+    memoController = TextEditingController(text: widget.linkData['lastMemo']);
+    tags = List<String>.from(widget.linkData['lastTags'] ?? []);
+    selectedFolder = widget.linkData['name'] ?? '기본폴더';
+    _loadFolders();
+  }
+
+  void _loadFolders() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    final snapshot =
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('folders')
+            .get();
+
+    final loadedFolders =
+        snapshot.docs.map((doc) => doc['name'] as String).toList();
+
+    setState(() {
+      final currentSet = Set<String>.from(folderList);
+      currentSet.addAll(loadedFolders);
+      if (!currentSet.contains(selectedFolder)) {
+        currentSet.add(selectedFolder);
+      }
+      folderList = currentSet.toList();
+    });
+  }
 
   void _showCreateFolderModal() {
     showDialog(
@@ -25,7 +64,9 @@ class _LinkUpdatePageState extends State<LinkUpdatePage> {
           (dialogContext) => CreateFolderModal(
             onCreate: (newFolder) {
               setState(() {
-                folderList.add(newFolder);
+                if (!folderList.contains(newFolder)) {
+                  folderList.add(newFolder);
+                }
                 selectedFolder = newFolder;
               });
               Navigator.pop(context);
@@ -35,6 +76,12 @@ class _LinkUpdatePageState extends State<LinkUpdatePage> {
   }
 
   void _showAddTagModal() {
+    if (tags.length >= 3) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('태그는 최대 3개까지 추가할 수 있습니다.')));
+      return;
+    }
     showDialog(
       context: context,
       builder: (dialogContext) => const AddTagModal(),
@@ -47,11 +94,43 @@ class _LinkUpdatePageState extends State<LinkUpdatePage> {
     });
   }
 
-  void _uploadChanges() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('업로드 되었습니다.')));
-    Navigator.pop(context);
+  void _uploadChanges() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final oldFolder = widget.linkData['name'];
+    final docId = widget.linkData['docId'];
+    if (uid == null || oldFolder == null || docId == null) return;
+
+    final folderRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('folders');
+
+    final newFolderRef = folderRef.doc(selectedFolder);
+    final newFolderSnap = await newFolderRef.get();
+    if (!newFolderSnap.exists) {
+      await newFolderRef.set({
+        'name': selectedFolder,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+
+    final oldLinkDoc = folderRef.doc(oldFolder).collection('links').doc(docId);
+    final oldData = await oldLinkDoc.get();
+    if (!oldData.exists) return;
+
+    final newLinkDoc = await newFolderRef.collection('links').add({
+      ...oldData.data()!,
+      'lastAddedUrl': linkController.text.trim(),
+      'lastMemo': memoController.text.trim(),
+      'lastTags': tags,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    await oldLinkDoc.delete();
+
+    if (mounted) {
+      Navigator.pop(context, true);
+    }
   }
 
   @override
@@ -78,9 +157,11 @@ class _LinkUpdatePageState extends State<LinkUpdatePage> {
                 color: const Color(0xFFF0F0F0),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(widget.link, style: const TextStyle(fontSize: 13)),
+              child: Text(
+                linkController.text,
+                style: const TextStyle(fontSize: 13),
+              ),
             ),
-
             const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -106,11 +187,7 @@ class _LinkUpdatePageState extends State<LinkUpdatePage> {
                   final folder = folderList[index];
                   final isSelected = selectedFolder == folder;
                   return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        selectedFolder = folder;
-                      });
-                    },
+                    onTap: () => setState(() => selectedFolder = folder),
                     child: Container(
                       width: 64,
                       padding: const EdgeInsets.all(8),
@@ -142,7 +219,6 @@ class _LinkUpdatePageState extends State<LinkUpdatePage> {
                 },
               ),
             ),
-
             const SizedBox(height: 24),
             const Text(
               '태그 *최대 3개까지 생성 가능',
@@ -170,7 +246,6 @@ class _LinkUpdatePageState extends State<LinkUpdatePage> {
                 ],
               ),
             ),
-
             const SizedBox(height: 24),
             const Text('메모', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
@@ -184,7 +259,6 @@ class _LinkUpdatePageState extends State<LinkUpdatePage> {
                 border: OutlineInputBorder(borderSide: BorderSide.none),
               ),
             ),
-
             const SizedBox(height: 40),
             SizedBox(
               width: double.infinity,

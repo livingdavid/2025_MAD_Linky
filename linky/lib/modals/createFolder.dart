@@ -21,7 +21,7 @@ class CreateFolderModal extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  '폴더명 생성',
+                  '폴더 생성',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 IconButton(
@@ -43,10 +43,9 @@ class CreateFolderModal extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: TextButton(
                 onPressed: () {
-                  final folderName = controller.text.trim();
-                  if (folderName.isNotEmpty) {
-                    onCreate(folderName);
-                    Navigator.pop(context);
+                  final name = controller.text.trim();
+                  if (name.isNotEmpty) {
+                    onCreate(name); // 콜백 호출
                   }
                 },
                 child: const Text(
