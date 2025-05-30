@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 class DeleteFolderModal extends StatelessWidget {
-  final VoidCallback onDelete;
+  final Future<void> Function() onDelete; // ✅ 비동기 삭제 함수로 변경
+
   const DeleteFolderModal({super.key, required this.onDelete});
 
   @override
@@ -35,7 +36,10 @@ class DeleteFolderModal extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: onDelete, // ✅ 삭제 버튼 클릭 시 실행됨
+              onPressed: () async {
+                await onDelete(); // ✅ 삭제 실행
+                Navigator.pop(context, true); // ✅ true 반환하여 상위 위젯에서 감지 가능
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.redAccent,
                 shape: RoundedRectangleBorder(
