@@ -40,7 +40,12 @@ class AddTagModal extends StatelessWidget {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-                onPressed: () {},
+                onPressed: () {
+                  final tag = controller.text.trim();
+                  if (tag.isNotEmpty) {
+                    Navigator.pop(context, tag); // 입력한 태그 반환
+                  }
+                },
                 child: const Text(
                   '추가 완료',
                   style: TextStyle(color: Colors.green),

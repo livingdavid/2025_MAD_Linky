@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'modals/addTag.dart';
 import 'modals/createFolder.dart';
 
@@ -10,12 +12,36 @@ class LinkUploadPage extends StatefulWidget {
 }
 
 class _LinkUploadPageState extends State<LinkUploadPage> {
-  String selectedFolder = '취업준비';
-  List<String> folderList = ['김지원', '지석영', '이민규'];
-  List<String> tags = ['태그1', '태그2', '태그3'];
+  String selectedFolder = '';
+  List<String> folderList = [];
+  List<String> tags = [];
 
   TextEditingController linkController = TextEditingController();
   TextEditingController memoController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFolders();
+  }
+
+  void _loadFolders() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    final snapshot =
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('folders')
+            .get();
+
+    final names = snapshot.docs.map((doc) => doc.id).toList();
+    setState(() {
+      folderList = names;
+      if (names.isNotEmpty) selectedFolder = names.first;
+    });
+  }
 
   void _showCreateFolderModal() {
     showDialog(
@@ -23,17 +49,27 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
       builder:
           (dialogContext) => CreateFolderModal(
             onCreate: (newFolder) {
-              setState(() {
-                folderList.add(newFolder);
-                selectedFolder = newFolder;
-              });
-              Navigator.pop(dialogContext);
+              Navigator.pop(dialogContext, newFolder);
             },
           ),
-    );
+    ).then((value) {
+      if (value != null && value is String && value.isNotEmpty) {
+        setState(() {
+          folderList.add(value);
+          selectedFolder = value;
+        });
+      }
+    });
   }
 
   void _showAddTagModal() {
+    if (tags.length >= 3) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('태그는 최대 3개까지 추가할 수 있습니다.')));
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (dialogContext) => const AddTagModal(),
@@ -46,11 +82,50 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
     });
   }
 
-  void _uploadChanges() {
+  void _uploadChanges() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || selectedFolder.isEmpty) return;
+
+    final folderRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('folders')
+        .doc(selectedFolder);
+
+    final folderSnapshot = await folderRef.get();
+
+    if (!folderSnapshot.exists) {
+      // 새 폴더일 경우에만 문서 생성
+      await folderRef.set({
+        'name': selectedFolder,
+        'lastAddedUrl': linkController.text.trim(),
+        'lastMemo': memoController.text.trim(),
+        'lastTags': tags,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } else {
+      // 기존 폴더일 경우 last 정보만 업데이트
+      await folderRef.update({
+        'lastAddedUrl': linkController.text.trim(),
+        'lastMemo': memoController.text.trim(),
+        'lastTags': tags,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+
+    // 링크 추가는 항상 links 서브컬렉션에
+    await folderRef.collection('links').add({
+      'url': linkController.text.trim(),
+      'memo': memoController.text.trim(),
+      'tags': tags,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('업로드 되었습니다.')));
-    Navigator.pop(context);
+
+    Navigator.pop(context, true);
   }
 
   @override
@@ -105,11 +180,7 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
                   final folder = folderList[index];
                   final isSelected = selectedFolder == folder;
                   return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        selectedFolder = folder;
-                      });
-                    },
+                    onTap: () => setState(() => selectedFolder = folder),
                     child: Container(
                       width: 64,
                       padding: const EdgeInsets.all(8),
@@ -143,10 +214,7 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
             ),
 
             const SizedBox(height: 24),
-            const Text(
-              '태그 *최대 3개까지 생성 가능',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
+            const Text('태그', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             SizedBox(
               height: 40,

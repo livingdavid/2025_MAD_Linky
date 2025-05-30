@@ -35,7 +35,7 @@ class DeleteFolderModal extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: () {},
+              onPressed: onDelete, // ✅ 삭제 버튼 클릭 시 실행됨
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.redAccent,
                 shape: RoundedRectangleBorder(
