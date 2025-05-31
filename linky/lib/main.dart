@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'login.dart';
-import 'home.dart'; // HomePage
+import 'home.dart';
 import 'linkUpload.dart';
 import 'linkView.dart';
 import 'modals/deleteFolder.dart';
