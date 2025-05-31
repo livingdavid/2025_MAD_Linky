@@ -281,8 +281,8 @@ class _FolderPageState extends State<FolderPage> {
             MaterialPageRoute(builder: (_) => const LinkUploadPage()),
           );
           if (result == true) {
-            await _loadLinks(); // 🔄 업로드 후 새로고침
-            Navigator.pop(context, true); // ✅ HomePage로 true 반환
+            await _loadLinks();
+            Navigator.pop(context, true);
           }
         },
         label: const Text('+ 업로드'),

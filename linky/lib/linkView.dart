@@ -52,7 +52,7 @@ class _LinkViewPageState extends State<LinkViewPage> {
             .collection('links')
             .doc(docId)
             .get();
-    Navigator.pop(context, true); // ✅ 삭제 후 true 반환
+    Navigator.pop(context, true);
 
     if (doc.exists) {
       setState(() {
@@ -198,10 +198,7 @@ class _LinkViewPageState extends State<LinkViewPage> {
                                                     .delete();
 
                                                 if (mounted)
-                                                  Navigator.pop(
-                                                    context,
-                                                    true,
-                                                  ); // LinkViewPage 닫기
+                                                  Navigator.pop(context, true);
                                               } catch (e) {
                                                 print('🔥 삭제 오류: $e');
                                                 ScaffoldMessenger.of(
