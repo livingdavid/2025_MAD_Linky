@@ -80,10 +80,18 @@ class _HomePageState extends State<HomePage> {
         filteredFolders = temp;
       });
     } catch (e) {
-      print("🔥 오류 발생: $e");
+      print("\uD83D\uDD25 \uC624\uB958 \uBC1C\uC0DD: $e");
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  void _showLoadingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
   }
 
   @override
@@ -107,11 +115,89 @@ class _HomePageState extends State<HomePage> {
               title: const Text('로그아웃'),
               onTap: () async {
                 await FirebaseAuth.instance.signOut();
-                Navigator.popUntil(context, (route) => route.isFirst);
+                if (context.mounted) {
+                  Navigator.pushNamedAndRemoveUntil(
+                    context,
+                    '/login',
+                    (route) => false,
+                  );
+                }
               },
             ),
-            const ListTile(
-              title: Text('회원탈퇴', style: TextStyle(color: Colors.red)),
+            ListTile(
+              title: const Text('회원탈퇴', style: TextStyle(color: Colors.red)),
+              onTap: () async {
+                final confirm = await showDialog(
+                  context: context,
+                  builder:
+                      (context) => AlertDialog(
+                        title: const Text('정말 탈퇴하시겠습니까?'),
+                        content: const Text('모든 데이터가 삭제됩니다. 이 작업은 되돌릴 수 없습니다.'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('취소'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text(
+                              '확인',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        ],
+                      ),
+                );
+
+                if (confirm != true) return;
+
+                _showLoadingDialog();
+
+                final user = FirebaseAuth.instance.currentUser;
+                final uid = user?.uid;
+
+                try {
+                  if (uid != null) {
+                    final userDoc = FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(uid);
+                    final folders = await userDoc.collection('folders').get();
+                    for (var folder in folders.docs) {
+                      final links =
+                          await folder.reference.collection('links').get();
+                      for (var link in links.docs) {
+                        await link.reference.delete();
+                      }
+                      await folder.reference.delete();
+                    }
+                    await userDoc.delete();
+                  }
+
+                  await user?.delete();
+                  await FirebaseAuth.instance.signOut();
+
+                  if (context.mounted) {
+                    Navigator.pop(context); // loading dialog
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      '/login',
+                      (_) => false,
+                    );
+                  }
+                } catch (e) {
+                  print('회원탈퇴 중 오류: $e');
+                  await FirebaseAuth.instance.signOut();
+
+                  if (context.mounted) {
+                    Navigator.pop(context); // loading dialog
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      '/login',
+                      (_) => false,
+                    );
+                  }
+                }
+              },
             ),
           ],
         ),
