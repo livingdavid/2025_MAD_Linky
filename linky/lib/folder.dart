@@ -64,6 +64,42 @@ class _FolderPageState extends State<FolderPage> {
     });
   }
 
+  TextSpan highlightQuery(String source, String query) {
+    if (query.isEmpty) return TextSpan(text: source);
+
+    final matches = RegExp(
+      RegExp.escape(query),
+      caseSensitive: false,
+    ).allMatches(source);
+
+    if (matches.isEmpty) return TextSpan(text: source);
+
+    final spans = <TextSpan>[];
+    int currentIndex = 0;
+
+    for (final match in matches) {
+      if (match.start > currentIndex) {
+        spans.add(TextSpan(text: source.substring(currentIndex, match.start)));
+      }
+      spans.add(
+        TextSpan(
+          text: source.substring(match.start, match.end),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
+      );
+      currentIndex = match.end;
+    }
+
+    if (currentIndex < source.length) {
+      spans.add(TextSpan(text: source.substring(currentIndex)));
+    }
+
+    return TextSpan(children: spans);
+  }
+
   @override
   Widget build(BuildContext context) {
     final links = folderData[selectedFolder] ?? [];
@@ -71,8 +107,14 @@ class _FolderPageState extends State<FolderPage> {
         links.where((link) {
           final title = (link['title'] ?? '').toString().toLowerCase();
           final memo = (link['memo'] ?? '').toString().toLowerCase();
+          final tags = (link['tags'] ?? '').toString().toLowerCase();
+          final url = (link['url'] ?? '').toString();
+          final domain = Uri.tryParse(url)?.host.toLowerCase() ?? '';
           final query = searchQuery.toLowerCase();
-          return title.contains(query) || memo.contains(query);
+          return title.contains(query) ||
+              memo.contains(query) ||
+              tags.contains(query) ||
+              domain.contains(query);
         }).toList();
 
     return Scaffold(
@@ -101,7 +143,6 @@ class _FolderPageState extends State<FolderPage> {
               style: const TextStyle(fontSize: 16, color: Colors.grey),
             ),
             const SizedBox(height: 20),
-
             TextField(
               onChanged: (value) => setState(() => searchQuery = value),
               decoration: InputDecoration(
@@ -116,7 +157,6 @@ class _FolderPageState extends State<FolderPage> {
               ),
             ),
             const SizedBox(height: 16),
-
             SizedBox(
               height: 40,
               child: ListView.builder(
@@ -153,7 +193,6 @@ class _FolderPageState extends State<FolderPage> {
               ),
             ),
             const SizedBox(height: 16),
-
             Expanded(
               child:
                   filteredLinks.isEmpty
@@ -215,40 +254,62 @@ class _FolderPageState extends State<FolderPage> {
                                     children: [
                                       Image.network(
                                         'https://www.google.com/s2/favicons?sz=64&domain_url=${link['url'] ?? ''}',
-                                        width: 20,
-                                        height: 20,
+                                        width: 24,
+                                        height: 24,
                                         errorBuilder:
                                             (_, __, ___) =>
                                                 const Icon(Icons.link),
                                       ),
                                       const SizedBox(width: 8),
-                                      Text(
-                                        Uri.parse(link['url'] ?? '').host,
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.green,
-                                          fontWeight: FontWeight.bold,
+                                      RichText(
+                                        text: TextSpan(
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.green,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          children: [
+                                            highlightQuery(
+                                              Uri.parse(link['url'] ?? '').host,
+                                              searchQuery,
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 12),
-                                  Text(
-                                    link['title'] ?? '',
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
+                                  RichText(
+                                    text: TextSpan(
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black,
+                                      ),
+                                      children: [
+                                        highlightQuery(
+                                          link['title'] ?? '',
+                                          searchQuery,
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    link['memo'] ?? '',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.grey,
-                                    ),
+                                  const SizedBox(height: 6),
+                                  RichText(
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
+                                    text: TextSpan(
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.grey,
+                                      ),
+                                      children: [
+                                        highlightQuery(
+                                          link['memo'] ?? '',
+                                          searchQuery,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                   const SizedBox(height: 12),
                                   if (tagList.isNotEmpty)
