@@ -1,8 +1,86 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'dart:async';
 import 'modals/addTag.dart';
 import 'modals/createFolder.dart';
+
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+
+Future<String?> summarizeTextWithHuggingFace(String text) async {
+  const apiUrl =
+      'https://api-inference.huggingface.co/models/sshleifer/distilbart-cnn-12-6';
+  const apiToken = '실제 토큰 값 입력';
+
+  try {
+    final shortened = text.length > 1000 ? text.substring(0, 1000) : text;
+
+    final response = await http
+        .post(
+          Uri.parse(apiUrl),
+          headers: {
+            'Authorization': 'Bearer $apiToken',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({'inputs': shortened}),
+        )
+        .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      final result = jsonDecode(response.body);
+
+      if (result is List && result.isNotEmpty && result[0] is Map) {
+        return result[0]['summary_text'];
+      } else {
+        debugPrint('⚠️ 예상치 못한 응답 형식: $result');
+      }
+    } else {
+      debugPrint('❌ 요청 실패: ${response.statusCode}');
+      debugPrint('❌ 응답 본문: ${response.body}');
+    }
+  } on TimeoutException {
+    debugPrint('❌ 요청 타임아웃 발생');
+  } catch (e) {
+    debugPrint('❌ 요약 예외 발생: $e');
+  }
+
+  return null;
+}
+
+Future<String?> extractTextFromUrl(String url) async {
+  final extractUrl = 'https://api.microlink.io/?url=$url';
+
+  try {
+    final response = await http.get(Uri.parse(extractUrl));
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
+      final data = json['data'];
+      final title = data['title'] ?? '';
+      final description = data['description'] ?? '';
+      final content = data['content'] ?? '';
+
+      final combined = [
+        title,
+        description,
+        content,
+      ].where((e) => e.trim().isNotEmpty).join('. ');
+
+      debugPrint('📄 추출된 내용: $combined');
+      return combined.length > 30 ? combined : null;
+    } else {
+      debugPrint('❌ Microlink 응답 오류: ${response.statusCode}');
+    }
+  } catch (e) {
+    debugPrint('❌ Microlink 예외: $e');
+  }
+  return null;
+}
 
 class LinkUploadPage extends StatefulWidget {
   const LinkUploadPage({super.key});
@@ -19,10 +97,64 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
   TextEditingController linkController = TextEditingController();
   TextEditingController memoController = TextEditingController();
 
+  bool isReminderSet = false;
+  String selectedInterval = '1분 후';
+
   @override
   void initState() {
     super.initState();
     _loadFolders();
+    _initNotifications();
+
+    linkController.addListener(() async {
+      final url = linkController.text.trim();
+      if (!url.startsWith('http')) return;
+
+      debugPrint('🟡 URL 감지됨: $url');
+
+      final extractedText = await extractTextFromUrl(url);
+      debugPrint('📄 추출된 텍스트 길이: ${extractedText?.length}');
+
+      if (extractedText == null || extractedText.length < 30) {
+        debugPrint('⚠️ 추출된 텍스트가 너무 짧아서 요약 생략');
+        return;
+      }
+
+      final trimmed =
+          extractedText.length > 1000
+              ? extractedText.substring(0, 1000)
+              : extractedText;
+
+      final summary = await summarizeTextWithHuggingFace(trimmed);
+      debugPrint('📝 요약 결과: $summary');
+
+      if (summary != null && mounted) {
+        memoController.text = summary;
+        setState(() {});
+        debugPrint('✅ 메모에 요약 적용됨');
+      } else {
+        memoController.text = '⚠️ 요약 실패: 내용을 직접 입력해 주세요.';
+        setState(() {});
+        debugPrint('❌ 요약 실패, fallback 메모 표시');
+      }
+    });
+  }
+
+  Future<void> _initNotifications() async {
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
+    const iosSettings = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+    const initializationSettings = InitializationSettings(
+      android: androidSettings,
+      iOS: iosSettings,
+    );
+    tz.initializeTimeZones();
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
   }
 
   void _loadFolders() async {
@@ -82,6 +214,30 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
     });
   }
 
+  Future<void> _scheduleReminder(String title, Duration delay) async {
+    final id = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+    await flutterLocalNotificationsPlugin.zonedSchedule(
+      id,
+      '저장한 링크 다시 보기',
+      '"$title" 링크를 다시 확인해보세요!',
+      tz.TZDateTime.now(tz.local).add(delay),
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'reminder_channel',
+          '링크 리마인더',
+          channelDescription: '링크 리마인더 알림',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+      androidAllowWhileIdle: true,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+    );
+  }
+
   void _uploadChanges() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null || selectedFolder.isEmpty) return;
@@ -93,33 +249,47 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
         .doc(selectedFolder);
 
     final folderSnapshot = await folderRef.get();
+    final title = linkController.text.trim();
 
     if (!folderSnapshot.exists) {
-      // 새 폴더일 경우에만 문서 생성
       await folderRef.set({
         'name': selectedFolder,
-        'lastAddedUrl': linkController.text.trim(),
+        'lastAddedUrl': title,
         'lastMemo': memoController.text.trim(),
         'lastTags': tags,
         'createdAt': FieldValue.serverTimestamp(),
       });
     } else {
-      // 기존 폴더일 경우 last 정보만 업데이트
       await folderRef.update({
-        'lastAddedUrl': linkController.text.trim(),
+        'lastAddedUrl': title,
         'lastMemo': memoController.text.trim(),
         'lastTags': tags,
         'updatedAt': FieldValue.serverTimestamp(),
       });
     }
 
-    // 링크 추가는 항상 links 서브컬렉션에
     await folderRef.collection('links').add({
-      'url': linkController.text.trim(),
+      'url': title,
       'memo': memoController.text.trim(),
       'tags': tags,
       'createdAt': FieldValue.serverTimestamp(),
     });
+
+    if (isReminderSet) {
+      Duration delay;
+      switch (selectedInterval) {
+        case '3분 후':
+          delay = const Duration(minutes: 3);
+          break;
+        case '7분 후':
+          delay = const Duration(minutes: 7);
+          break;
+        case '1분 후':
+        default:
+          delay = const Duration(minutes: 1);
+      }
+      await _scheduleReminder(title, delay);
+    }
 
     ScaffoldMessenger.of(
       context,
@@ -154,7 +324,7 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
                 border: OutlineInputBorder(borderSide: BorderSide.none),
               ),
             ),
-
+            const SizedBox(height: 16),
             const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -212,7 +382,6 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
                 },
               ),
             ),
-
             const SizedBox(height: 24),
             const Text('태그', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
@@ -237,7 +406,6 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
                 ],
               ),
             ),
-
             const SizedBox(height: 24),
             const Text('메모', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
@@ -251,7 +419,21 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
                 border: OutlineInputBorder(borderSide: BorderSide.none),
               ),
             ),
-
+            const SizedBox(height: 24),
+            CheckboxListTile(
+              value: isReminderSet,
+              onChanged: (val) => setState(() => isReminderSet = val!),
+              title: const Text('리마인더 알림 설정'),
+            ),
+            if (isReminderSet)
+              DropdownButton<String>(
+                value: selectedInterval,
+                onChanged: (val) => setState(() => selectedInterval = val!),
+                items:
+                    ['1분 후', '3분 후', '7분 후']
+                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                        .toList(),
+              ),
             const SizedBox(height: 40),
             SizedBox(
               width: double.infinity,

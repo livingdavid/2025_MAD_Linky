@@ -15,16 +15,20 @@ dependencies:
   url_launcher: ^6.2.4
   share_plus: ^7.2.1
   cloud_firestore: ^5.6.8
-
-dev_dependencies:
-  flutter_launcher_icons: ^0.13.1
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^5.0.0
-  flutter_native_splash: ^2.3.10
   firebase_core: ^3.13.1
   firebase_auth: ^5.5.2
   google_sign_in: ^6.3.0
+
+  flutter_local_notifications: ^17.0.0
+  timezone: ^0.9.2
+  http: ^1.4.0 # ✅ 요약 요청용 HTTP 추가
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.3.10
 
 flutter_launcher_icons:
   android: true
