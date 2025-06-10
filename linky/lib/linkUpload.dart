@@ -16,7 +16,7 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 Future<String?> summarizeTextWithHuggingFace(String text) async {
   const apiUrl =
       'https://api-inference.huggingface.co/models/sshleifer/distilbart-cnn-12-6';
-  const apiToken = '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';
+  const apiToken = '실제 토큰 값 입력';
 
   try {
     final shortened = text.length > 1000 ? text.substring(0, 1000) : text;
