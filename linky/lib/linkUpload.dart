@@ -6,7 +6,7 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-
+import 'dart:async';
 import 'modals/addTag.dart';
 import 'modals/createFolder.dart';
 
@@ -15,28 +15,70 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 
 Future<String?> summarizeTextWithHuggingFace(String text) async {
   const apiUrl =
-      'https://api-inference.huggingface.co/models/facebook/bart-large-cnn';
-  const apiToken = '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';
+      'https://api-inference.huggingface.co/models/sshleifer/distilbart-cnn-12-6';
+  const apiToken = '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';
 
-  final response = await http.post(
-    Uri.parse(apiUrl),
-    headers: {
-      'Authorization': 'Bearer $apiToken',
-      'Content-Type': 'application/json',
-    },
-    body: jsonEncode({'inputs': text}),
-  );
+  try {
+    final shortened = text.length > 1000 ? text.substring(0, 1000) : text;
 
-  if (response.statusCode == 200) {
-    final result = jsonDecode(response.body);
-    if (result is List && result.isNotEmpty) {
-      return result[0]['summary_text'];
+    final response = await http
+        .post(
+          Uri.parse(apiUrl),
+          headers: {
+            'Authorization': 'Bearer $apiToken',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({'inputs': shortened}),
+        )
+        .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      final result = jsonDecode(response.body);
+
+      if (result is List && result.isNotEmpty && result[0] is Map) {
+        return result[0]['summary_text'];
+      } else {
+        debugPrint('⚠️ 예상치 못한 응답 형식: $result');
+      }
+    } else {
+      debugPrint('❌ 요청 실패: ${response.statusCode}');
+      debugPrint('❌ 응답 본문: ${response.body}');
     }
-  } else {
-    print('❌ 요청 실패: ${response.statusCode}');
-    print('❌ 응답 본문: ${response.body}');
+  } on TimeoutException {
+    debugPrint('❌ 요청 타임아웃 발생');
+  } catch (e) {
+    debugPrint('❌ 요약 예외 발생: $e');
   }
 
+  return null;
+}
+
+Future<String?> extractTextFromUrl(String url) async {
+  final extractUrl = 'https://api.microlink.io/?url=$url';
+
+  try {
+    final response = await http.get(Uri.parse(extractUrl));
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
+      final data = json['data'];
+      final title = data['title'] ?? '';
+      final description = data['description'] ?? '';
+      final content = data['content'] ?? '';
+
+      final combined = [
+        title,
+        description,
+        content,
+      ].where((e) => e.trim().isNotEmpty).join('. ');
+
+      debugPrint('📄 추출된 내용: $combined');
+      return combined.length > 30 ? combined : null;
+    } else {
+      debugPrint('❌ Microlink 응답 오류: ${response.statusCode}');
+    }
+  } catch (e) {
+    debugPrint('❌ Microlink 예외: $e');
+  }
   return null;
 }
 
@@ -66,80 +108,54 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
 
     linkController.addListener(() async {
       final url = linkController.text.trim();
-      if (url.startsWith('http')) {
-        final extractedText = await extractTextFromUrl(url);
-        if (extractedText != null && extractedText.length > 30) {
-          final summary = await summarizeTextWithHuggingFace(extractedText);
-          if (summary != null && mounted) {
-            setState(() {
-              memoController.text = summary;
-            });
-          }
-        }
+      if (!url.startsWith('http')) return;
+
+      debugPrint('🟡 URL 감지됨: $url');
+
+      final extractedText = await extractTextFromUrl(url);
+      debugPrint('📄 추출된 텍스트 길이: ${extractedText?.length}');
+
+      if (extractedText == null || extractedText.length < 30) {
+        debugPrint('⚠️ 추출된 텍스트가 너무 짧아서 요약 생략');
+        return;
+      }
+
+      final trimmed =
+          extractedText.length > 1000
+              ? extractedText.substring(0, 1000)
+              : extractedText;
+
+      final summary = await summarizeTextWithHuggingFace(trimmed);
+      debugPrint('📝 요약 결과: $summary');
+
+      if (summary != null && mounted) {
+        memoController.text = summary;
+        setState(() {});
+        debugPrint('✅ 메모에 요약 적용됨');
+      } else {
+        memoController.text = '⚠️ 요약 실패: 내용을 직접 입력해 주세요.';
+        setState(() {});
+        debugPrint('❌ 요약 실패, fallback 메모 표시');
       }
     });
-  }
-
-  Future<String?> extractTextFromUrl(String url) async {
-    const apiKey = 'a9d7166be40af6f13dc201e457fb2271';
-    final apiUrl = 'https://api.linkpreview.net/?key=$apiKey&q=$url';
-
-    try {
-      final response = await http.get(Uri.parse(apiUrl));
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        print('📥 LinkPreview 응답: $json');
-        return json['description'];
-      } else {
-        print('❌ LinkPreview 응답 오류: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('❌ LinkPreview 오류: $e');
-    }
-    return null;
   }
 
   Future<void> _initNotifications() async {
     const androidSettings = AndroidInitializationSettings(
       '@mipmap/ic_launcher',
     );
-
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
     );
-
     const initializationSettings = InitializationSettings(
       android: androidSettings,
       iOS: iosSettings,
     );
-
     tz.initializeTimeZones();
     await flutterLocalNotificationsPlugin.initialize(initializationSettings);
   }
-
-  // Future<void> _testNotification() async {
-  //   await flutterLocalNotificationsPlugin.zonedSchedule(
-  //     999,
-  //     '테스트 알림',
-  //     '이건 리마인더 알림 테스트입니다.',
-  //     tz.TZDateTime.now(tz.local).add(const Duration(seconds: 5)),
-  //     const NotificationDetails(
-  //       android: AndroidNotificationDetails(
-  //         'test_channel',
-  //         '테스트 채널',
-  //         channelDescription: '테스트용 알림입니다.',
-  //         importance: Importance.max,
-  //         priority: Priority.high,
-  //       ),
-  //       iOS: DarwinNotificationDetails(),
-  //     ),
-  //     androidAllowWhileIdle: true,
-  //     uiLocalNotificationDateInterpretation:
-  //         UILocalNotificationDateInterpretation.absoluteTime,
-  //   );
-  // }
 
   void _loadFolders() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -309,10 +325,6 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
               ),
             ),
             const SizedBox(height: 16),
-            // ElevatedButton(
-            //   onPressed: _testNotification,
-            //   child: const Text('🔔 알림 테스트'),
-            // ),
             const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
