@@ -16,7 +16,7 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 Future<String?> summarizeTextWithHuggingFace(String text) async {
   const apiUrl =
       'https://api-inference.huggingface.co/models/sshleifer/distilbart-cnn-12-6';
-  const apiToken = '실제 토큰 값 입력';
+  const apiToken = '';
 
   try {
     final shortened = text.length > 1000 ? text.substring(0, 1000) : text;
@@ -53,6 +53,8 @@ Future<String?> summarizeTextWithHuggingFace(String text) async {
   return null;
 }
 
+String? extractedTitle;
+
 Future<String?> extractTextFromUrl(String url) async {
   final extractUrl = 'https://api.microlink.io/?url=$url';
 
@@ -71,10 +73,10 @@ Future<String?> extractTextFromUrl(String url) async {
         content,
       ].where((e) => e.trim().isNotEmpty).join('. ');
 
-      debugPrint('📄 추출된 내용: $combined');
+      debugPrint('📄 추출된 제목: $title');
+      extractedTitle = title;
+
       return combined.length > 30 ? combined : null;
-    } else {
-      debugPrint('❌ Microlink 응답 오류: ${response.statusCode}');
     }
   } catch (e) {
     debugPrint('❌ Microlink 예외: $e');
@@ -98,7 +100,7 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
   TextEditingController memoController = TextEditingController();
 
   bool isReminderSet = false;
-  String selectedInterval = '1분 후';
+  DateTime? scheduledDateTime;
 
   @override
   void initState() {
@@ -249,19 +251,20 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
         .doc(selectedFolder);
 
     final folderSnapshot = await folderRef.get();
-    final title = linkController.text.trim();
+    final url = linkController.text.trim();
+    final title = extractedTitle ?? Uri.parse(url).host;
 
     if (!folderSnapshot.exists) {
       await folderRef.set({
         'name': selectedFolder,
-        'lastAddedUrl': title,
+        'lastAddedUrl': url,
         'lastMemo': memoController.text.trim(),
         'lastTags': tags,
         'createdAt': FieldValue.serverTimestamp(),
       });
     } else {
       await folderRef.update({
-        'lastAddedUrl': title,
+        'lastAddedUrl': url,
         'lastMemo': memoController.text.trim(),
         'lastTags': tags,
         'updatedAt': FieldValue.serverTimestamp(),
@@ -269,24 +272,20 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
     }
 
     await folderRef.collection('links').add({
-      'url': title,
+      'url': url,
+      'title': title,
       'memo': memoController.text.trim(),
       'tags': tags,
       'createdAt': FieldValue.serverTimestamp(),
     });
 
-    if (isReminderSet) {
-      Duration delay;
-      switch (selectedInterval) {
-        case '3분 후':
-          delay = const Duration(minutes: 3);
-          break;
-        case '7분 후':
-          delay = const Duration(minutes: 7);
-          break;
-        case '1분 후':
-        default:
-          delay = const Duration(minutes: 1);
+    if (isReminderSet && scheduledDateTime != null) {
+      final delay = scheduledDateTime!.difference(DateTime.now());
+      if (delay.isNegative) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('과거 시간은 선택할 수 없습니다.')));
+        return;
       }
       await _scheduleReminder(title, delay);
     }
@@ -324,7 +323,6 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
                 border: OutlineInputBorder(borderSide: BorderSide.none),
               ),
             ),
-            const SizedBox(height: 16),
             const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -426,13 +424,46 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
               title: const Text('리마인더 알림 설정'),
             ),
             if (isReminderSet)
-              DropdownButton<String>(
-                value: selectedInterval,
-                onChanged: (val) => setState(() => selectedInterval = val!),
-                items:
-                    ['1분 후', '3분 후', '7분 후']
-                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                        .toList(),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextButton.icon(
+                    icon: const Icon(Icons.calendar_today),
+                    label: Text(
+                      scheduledDateTime != null
+                          ? '${scheduledDateTime!.year}-${scheduledDateTime!.month.toString().padLeft(2, '0')}-${scheduledDateTime!.day.toString().padLeft(2, '0')} '
+                              '${scheduledDateTime!.hour.toString().padLeft(2, '0')}:${scheduledDateTime!.minute.toString().padLeft(2, '0')}'
+                          : '날짜 및 시간 선택',
+                    ),
+                    onPressed: () async {
+                      final now = DateTime.now();
+                      final pickedDate = await showDatePicker(
+                        context: context,
+                        initialDate: now,
+                        firstDate: now,
+                        lastDate: DateTime(now.year + 5),
+                      );
+                      if (pickedDate == null) return;
+                      final pickedTime = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.fromDateTime(
+                          now.add(const Duration(minutes: 1)),
+                        ),
+                      );
+                      if (pickedTime == null) return;
+                      final pickedDateTime = DateTime(
+                        pickedDate.year,
+                        pickedDate.month,
+                        pickedDate.day,
+                        pickedTime.hour,
+                        pickedTime.minute,
+                      );
+                      setState(() {
+                        scheduledDateTime = pickedDateTime;
+                      });
+                    },
+                  ),
+                ],
               ),
             const SizedBox(height: 40),
             SizedBox(
