@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 Future<String?> summarizeTextWithHuggingFace(String text) async {
   const apiUrl =
       'https://api-inference.huggingface.co/models/facebook/bart-large-cnn';
-  const apiToken = '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'; // 실제 토큰 입력
+  // const apiToken = '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'; // 주석 해제 후 사용
 
   final response = await http.post(
     Uri.parse(apiUrl),

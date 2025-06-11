@@ -55,13 +55,14 @@ class _LinkViewPageState extends State<LinkViewPage> {
     Navigator.pop(context, true);
 
     if (doc.exists) {
+      final data = doc.data()!;
       setState(() {
-        final data = doc.data()!;
         linkData = {
           'lastAddedUrl': data['url'] ?? '',
           'lastMemo': data['memo'] ?? '',
           'lastTags': data['tags'] ?? [],
           'createdAt': data['createdAt'] ?? Timestamp.now(),
+          'title': data['title'] ?? '',
           'name': folder,
           'docId': docId,
         };
@@ -90,7 +91,10 @@ class _LinkViewPageState extends State<LinkViewPage> {
 
     final String faviconUrl =
         'https://www.google.com/s2/favicons?sz=64&domain_url=$link';
-    final String pageTitle = Uri.parse(link).host;
+    final String pageTitle =
+        (linkData['title'] as String?)?.trim().isNotEmpty == true
+            ? linkData['title']
+            : Uri.parse(link).host;
 
     return Scaffold(
       floatingActionButton: Padding(
@@ -158,7 +162,6 @@ class _LinkViewPageState extends State<LinkViewPage> {
                                             ),
                                       ),
                                     );
-
                                     if (result == true || result is Map) {
                                       await _refreshLinkData();
                                       Navigator.pop(context, true);
@@ -170,23 +173,18 @@ class _LinkViewPageState extends State<LinkViewPage> {
                                       builder:
                                           (_) => DeleteFolderModal(
                                             onDelete: () async {
-                                              Navigator.pop(
-                                                context,
-                                              ); // 다이얼로그 닫기
-
+                                              Navigator.pop(context);
                                               final uid =
                                                   FirebaseAuth
                                                       .instance
                                                       .currentUser
                                                       ?.uid;
                                               if (uid == null) return;
-
                                               final folder = linkData['name'];
                                               final docId = linkData['docId'];
                                               if (folder == null ||
                                                   docId == null)
                                                 return;
-
                                               try {
                                                 await FirebaseFirestore.instance
                                                     .collection('users')
@@ -196,7 +194,6 @@ class _LinkViewPageState extends State<LinkViewPage> {
                                                     .collection('links')
                                                     .doc(docId)
                                                     .delete();
-
                                                 if (mounted)
                                                   Navigator.pop(context, true);
                                               } catch (e) {

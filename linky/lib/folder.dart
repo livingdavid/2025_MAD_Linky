@@ -223,6 +223,7 @@ class _FolderPageState extends State<FolderPage> {
                                           'createdAt':
                                               link['createdAt'] ??
                                               Timestamp.now(),
+                                          'title': link['title'] ?? '',
                                           'name': selectedFolder,
                                           'docId': link['docId'] ?? '',
                                         },
@@ -261,19 +262,15 @@ class _FolderPageState extends State<FolderPage> {
                                                 const Icon(Icons.link),
                                       ),
                                       const SizedBox(width: 8),
-                                      RichText(
-                                        text: TextSpan(
+                                      Flexible(
+                                        child: Text(
+                                          link['url'] ?? '제목 없음',
+                                          overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(
                                             fontSize: 12,
                                             color: Colors.green,
                                             fontWeight: FontWeight.bold,
                                           ),
-                                          children: [
-                                            highlightQuery(
-                                              Uri.parse(link['url'] ?? '').host,
-                                              searchQuery,
-                                            ),
-                                          ],
                                         ),
                                       ),
                                     ],
@@ -316,14 +313,16 @@ class _FolderPageState extends State<FolderPage> {
                                     Wrap(
                                       spacing: 8,
                                       children:
-                                          tagList.map((tag) {
-                                            return Chip(
-                                              label: Text(tag),
-                                              backgroundColor: const Color(
-                                                0xFFF0F0F0,
-                                              ),
-                                            );
-                                          }).toList(),
+                                          tagList
+                                              .map(
+                                                (tag) => Chip(
+                                                  label: Text(tag),
+                                                  backgroundColor: const Color(
+                                                    0xFFF0F0F0,
+                                                  ),
+                                                ),
+                                              )
+                                              .toList(),
                                     ),
                                 ],
                               ),
@@ -346,7 +345,8 @@ class _FolderPageState extends State<FolderPage> {
             Navigator.pop(context, true);
           }
         },
-        label: const Text('+ 업로드'),
+        label: const Text('업로드'),
+        icon: const Icon(Icons.add),
         backgroundColor: Colors.green,
       ),
     );
