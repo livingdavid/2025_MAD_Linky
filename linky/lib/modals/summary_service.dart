@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 Future<String?> summarizeTextWithHuggingFace(String text) async {
   const apiUrl =
       'https://api-inference.huggingface.co/models/sshleifer/distilbart-cnn-12-6';
-  const apiToken = '';
+  const apiToken = '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';
 
   try {
     final shortened = text.length > 1000 ? text.substring(0, 1000) : text;

@@ -1,11 +1,12 @@
-// 상태변경 설정 페이지
+// auth_gate.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'login.dart';
+import 'login.dart'; // ← LoginPage 정의된 파일
 import 'home.dart';
 
 class AuthGate extends StatelessWidget {
-  const AuthGate({super.key});
+  final String? initialLink;
+  const AuthGate({super.key, this.initialLink});
 
   @override
   Widget build(BuildContext context) {
@@ -17,10 +18,10 @@ class AuthGate extends StatelessWidget {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-
         if (snapshot.hasData) {
           final user = snapshot.data!;
           return HomePage(
+            initialLink: initialLink,
             userName: user.isAnonymous ? '익명 사용자' : user.displayName ?? '사용자',
             email: user.isAnonymous ? '' : user.email ?? '',
             photoUrl: user.isAnonymous ? null : user.photoURL,

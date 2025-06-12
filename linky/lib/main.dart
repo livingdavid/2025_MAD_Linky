@@ -1,74 +1,133 @@
+// main.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
-import 'package:timezone/timezone.dart' as tz;
-
-import 'firebase_options.dart';
+import 'package:shared_preference_app_group/shared_preference_app_group.dart';
 import 'auth_gate.dart';
+import 'linkUpload.dart'; // LinkUploadPage 선언부 import
 
-// 🔔 알림 플러그인 전역 선언
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+/// 앱이 백그라운드 상태에서 알림을 탭했을 때 실행되는 콜백 (entry-point로 표시)
+@pragma('vm:entry-point')
+void notificationTapBackground(NotificationResponse response) async {
+  final link = response.payload;
+  if (link?.isNotEmpty ?? false) {
+    // 백그라운드에서 탭 시 공유 링크 저장
+    await SharedPreferenceAppGroup.setAppGroup('group.com.linky');
+    await SharedPreferenceAppGroup.setString('sharedLink', link!);
+  }
+}
+
+/// onDidReceiveNotificationResponse에서 호출되는 내부 함수
+void _handleNotificationTap(NotificationResponse resp) async {
+  final link = resp.payload;
+  if (link?.isNotEmpty ?? false) {
+    await SharedPreferenceAppGroup.setAppGroup('group.com.linky');
+    await SharedPreferenceAppGroup.setString('sharedLink', link!);
+    navigatorKey.currentState?.push(
+      MaterialPageRoute(builder: (_) => LinkUploadPage(initialUrl: link!)),
+    );
+  }
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  // 🔔 시간대 초기화
+  await Firebase.initializeApp();
+  // App Group 설정
+  await SharedPreferenceAppGroup.setAppGroup('group.com.linky');
   tz.initializeTimeZones();
 
-  // 🔔 안드로이드 설정
-  const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/ic_launcher');
-
-  // 🔔 iOS 설정
-  const DarwinInitializationSettings initializationSettingsIOS =
-      DarwinInitializationSettings(
-        requestAlertPermission: true,
-        requestBadgePermission: true,
-        requestSoundPermission: true,
-      );
-
-  // 🔔 통합 초기화 설정
-  const InitializationSettings initializationSettings = InitializationSettings(
-    android: initializationSettingsAndroid,
-    iOS: initializationSettingsIOS,
+  // 알림 초기 설정
+  const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const iosSettings = DarwinInitializationSettings();
+  final initSettings = InitializationSettings(
+    android: androidSettings,
+    iOS: iosSettings,
   );
 
-  // 🔔 초기화 실행
-  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+  await flutterLocalNotificationsPlugin.initialize(
+    initSettings,
+    onDidReceiveNotificationResponse: _handleNotificationTap,
+    onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
+  );
 
-  // 🔔 iOS 권한 요청 (중요!)
-  await _requestIOSPermissions();
+  // iOS 권한 요청
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+        IOSFlutterLocalNotificationsPlugin
+      >()
+      ?.requestPermissions(alert: true, sound: true, badge: true);
 
-  runApp(const MyApp());
+  // 앱 종료 상태에서 알림 탭으로 시작했는지 확인
+  final details =
+      await flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails();
+  String? initialLink;
+
+  if (details?.didNotificationLaunchApp ?? false) {
+    initialLink = details!.notificationResponse?.payload;
+  }
+
+  // 이외에 Share Extension에서 전달된 링크도 통합 처리
+  final sharedLink = await SharedPreferenceAppGroup.getString('sharedLink');
+  if (sharedLink != null) {
+    await SharedPreferenceAppGroup.remove('sharedLink');
+    initialLink ??= sharedLink;
+  }
+
+  runApp(MyApp(initialLink: initialLink));
 }
 
-// 🔔 iOS 알림 권한 요청 함수
-Future<void> _requestIOSPermissions() async {
-  final iosPlugin =
-      flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin
-          >();
-  await iosPlugin?.requestPermissions(alert: true, badge: true, sound: true);
+class MyApp extends StatefulWidget {
+  final String? initialLink;
+  const MyApp({super.key, this.initialLink});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // 초기 링크는 AuthGate를 통해 자동 처리
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // **백그라운드→포그라운드 복귀** 시 링크 체크
+    if (state == AppLifecycleState.resumed) {
+      _checkSharedLink();
+    }
+  }
+
+  Future<void> _checkSharedLink() async {
+    final link = await SharedPreferenceAppGroup.getString('sharedLink');
+    if (link != null) {
+      await SharedPreferenceAppGroup.remove('sharedLink');
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (_) => LinkUploadPage(initialUrl: link)),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'Linky',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color.fromARGB(255, 58, 183, 110),
-        ),
-      ),
       debugShowCheckedModeBanner: false,
-      home: const AuthGate(),
+      home: AuthGate(initialLink: widget.initialLink),
     );
   }
 }

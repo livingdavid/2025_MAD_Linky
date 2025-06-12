@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+  <key>NSExtension</key>
+<dict>
+  <key>NSExtensionPointIdentifier</key>
+  <string>com.apple.share-services</string>
+  <key>NSExtensionPrincipalClass</key>
+  <string>$(PRODUCT_MODULE_NAME).ShareViewController</string>
+  <key>NSExtensionAttributes</key>
+  <dict>
+    <key>NSExtensionActivationRule</key>
+    <dict>
+      <key>NSExtensionActivationSupportsWebURLWithMaxCount</key>
+      <integer>1</integer>
+      <key>NSExtensionActivationSupportsText</key>
+      <true/>
+    </dict>
+  </dict>
+</dict>
+<key>NSCameraUsageDescription</key>
+<string>QR 코드 스캔을 위해 카메라 접근이 필요합니다.</string>
+
+</dict>
+</plist>

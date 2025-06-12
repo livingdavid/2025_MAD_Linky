@@ -1,6 +1,6 @@
 name: linky
-description: 'A new Flutter project.'
-publish_to: 'none'
+description: "A new Flutter project."
+publish_to: "none"
 version: 1.0.0+1
 
 environment:
@@ -21,7 +21,10 @@ dependencies:
 
   flutter_local_notifications: ^17.0.0
   timezone: ^0.9.2
-  http: ^1.4.0 # ✅ 요약 요청용 HTTP 추가
+  http: ^1.4.0 # 요약 API 요청을 위한 HTTP 패키지
+  intl: ^0.20.2
+  mobile_scanner: ^7.0.1 # ✅ QR/바코드 스캔용 :contentReference[oaicite:1]{index=1}
+  shared_preference_app_group: ^1.1.1 # ✅ iOS App Group 기반 공유 URL 수신용 :contentReference[oaicite:2]{index=2}
 
 dev_dependencies:
   flutter_test:
@@ -41,7 +44,7 @@ flutter:
     - assets/images/Linky.png
 
 flutter_native_splash:
-  color: '#FEFEE9'
+  color: "#FEFEE9"
   image: assets/images/Linky.png
   android: true
   ios: true
