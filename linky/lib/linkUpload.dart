@@ -16,7 +16,7 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 Future<String?> summarizeTextWithHuggingFace(String text) async {
   const apiUrl =
       'https://api-inference.huggingface.co/models/sshleifer/distilbart-cnn-12-6';
-  const apiToken = '';
+  // const apiToken = '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'; // 주석 해제 후 사용
 
   try {
     final shortened = text.length > 1000 ? text.substring(0, 1000) : text;
@@ -54,6 +54,7 @@ Future<String?> summarizeTextWithHuggingFace(String text) async {
 }
 
 String? extractedTitle;
+String? extractedImageUrl; // 추가
 
 Future<String?> extractTextFromUrl(String url) async {
   final extractUrl = 'https://api.microlink.io/?url=$url';
@@ -66,6 +67,7 @@ Future<String?> extractTextFromUrl(String url) async {
       final title = data['title'] ?? '';
       final description = data['description'] ?? '';
       final content = data['content'] ?? '';
+      final imageUrl = data['image']?['url'] ?? ''; // ✅ 대표 이미지
 
       final combined = [
         title,
@@ -74,7 +76,10 @@ Future<String?> extractTextFromUrl(String url) async {
       ].where((e) => e.trim().isNotEmpty).join('. ');
 
       debugPrint('📄 추출된 제목: $title');
+      debugPrint('🖼️ 대표 이미지 URL: $imageUrl');
+
       extractedTitle = title;
+      extractedImageUrl = imageUrl; // ✅ 전역 변수에 저장
 
       return combined.length > 30 ? combined : null;
     }
@@ -108,6 +113,11 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
     _loadFolders();
     _initNotifications();
 
+    bool containsKorean(String text) {
+      final koreanRegex = RegExp(r'[가-힣]');
+      return koreanRegex.hasMatch(text);
+    }
+
     linkController.addListener(() async {
       final url = linkController.text.trim();
       if (!url.startsWith('http')) return;
@@ -119,6 +129,12 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
 
       if (extractedText == null || extractedText.length < 30) {
         debugPrint('⚠️ 추출된 텍스트가 너무 짧아서 요약 생략');
+        return;
+      }
+
+      // ✅ 한국어 포함 시 요약 생략
+      if (containsKorean(extractedText)) {
+        debugPrint('🛑 한국어 포함되어 있어 요약 생략');
         return;
       }
 
@@ -241,6 +257,7 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
   }
 
   void _uploadChanges() async {
+    print('🧪 Firestore에 저장할 imageUrl: $extractedImageUrl');
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null || selectedFolder.isEmpty) return;
 
@@ -260,6 +277,7 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
         'lastAddedUrl': url,
         'lastMemo': memoController.text.trim(),
         'lastTags': tags,
+        'imageUrl': extractedImageUrl ?? '',
         'createdAt': FieldValue.serverTimestamp(),
       });
     } else {
@@ -267,6 +285,8 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
         'lastAddedUrl': url,
         'lastMemo': memoController.text.trim(),
         'lastTags': tags,
+        'imageUrl': extractedImageUrl ?? '',
+
         'updatedAt': FieldValue.serverTimestamp(),
       });
     }
@@ -276,6 +296,7 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
       'title': title,
       'memo': memoController.text.trim(),
       'tags': tags,
+      'imageUrl': extractedImageUrl ?? '',
       'createdAt': FieldValue.serverTimestamp(),
     });
 
