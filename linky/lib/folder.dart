@@ -56,6 +56,7 @@ class _FolderPageState extends State<FolderPage> {
             'tags': (data['tags'] as List<dynamic>?)?.join(',') ?? '',
             'createdAt': data['createdAt'] ?? Timestamp.now(),
             'docId': doc.id,
+            'imageUrl': data['imageUrl'] ?? '',
           };
         }).toList();
 
@@ -226,6 +227,7 @@ class _FolderPageState extends State<FolderPage> {
                                           'title': link['title'] ?? '',
                                           'name': selectedFolder,
                                           'docId': link['docId'] ?? '',
+                                          'imageUrl': link['imageUrl'] ?? '',
                                         },
                                       ),
                                 ),

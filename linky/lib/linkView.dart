@@ -65,6 +65,7 @@ class _LinkViewPageState extends State<LinkViewPage> {
           'title': data['title'] ?? '',
           'name': folder,
           'docId': docId,
+          'imageUrl': data['imageUrl'] ?? '',
         };
       });
     }
@@ -72,6 +73,7 @@ class _LinkViewPageState extends State<LinkViewPage> {
 
   @override
   Widget build(BuildContext context) {
+    print('🧪 linkData[imageUrl]: ${linkData['imageUrl']}');
     final String link = linkData['lastAddedUrl'] ?? '';
     final String folderName = linkData['name'] ?? '';
     final List<String> tags =
@@ -120,12 +122,23 @@ class _LinkViewPageState extends State<LinkViewPage> {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.asset(
-                    'assets/images/Linky.png',
-                    fit: BoxFit.cover,
-                    color: Colors.black.withOpacity(0.45),
-                    colorBlendMode: BlendMode.darken,
-                  ),
+                  linkData['imageUrl'] != null &&
+                          (linkData['imageUrl'] as String).trim().isNotEmpty
+                      ? Image.network(
+                        linkData['imageUrl'],
+                        fit: BoxFit.cover,
+                        height: 260, // 높이 제한 추가
+                        errorBuilder:
+                            (_, __, ___) => Image.asset(
+                              'assets/images/Linky.png',
+                              fit: BoxFit.cover,
+                            ),
+                      )
+                      : Image.asset(
+                        'assets/images/Linky.png',
+                        fit: BoxFit.cover,
+                      ),
+                  Container(color: Colors.black.withOpacity(0.45)),
                   SafeArea(
                     child: Stack(
                       children: [
@@ -255,6 +268,8 @@ class _LinkViewPageState extends State<LinkViewPage> {
                                   fontSize: 22,
                                   fontWeight: FontWeight.bold,
                                 ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
                               Text(
                                 '${uploadDate.year}.${uploadDate.month.toString().padLeft(2, '0')}.${uploadDate.day.toString().padLeft(2, '0')}',
