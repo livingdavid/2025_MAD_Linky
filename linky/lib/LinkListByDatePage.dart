@@ -2,18 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'linkView.dart';
 
 class LinkListByDatePage extends StatefulWidget {
-  final String folderName;
-
-  const LinkListByDatePage({required this.folderName, super.key});
+  const LinkListByDatePage({super.key});
 
   @override
   State<LinkListByDatePage> createState() => _LinkListByDatePageState();
 }
 
-class _LinkListByDatePageState extends State<LinkListByDatePage>
-    with SingleTickerProviderStateMixin {
+class _LinkListByDatePageState extends State<LinkListByDatePage> {
   Map<String, List<Map<String, dynamic>>> groupedLinks = {};
   bool isLoading = true;
   DateTime? selectedDate;
@@ -21,40 +19,52 @@ class _LinkListByDatePageState extends State<LinkListByDatePage>
   @override
   void initState() {
     super.initState();
-    _fetchLinks();
+    _fetchAllLinks();
   }
 
-  Future<void> _fetchLinks() async {
+  Future<void> _fetchAllLinks() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    final snapshot =
+    final foldersSnapshot =
         await FirebaseFirestore.instance
             .collection('users')
             .doc(uid)
             .collection('folders')
-            .doc(widget.folderName)
-            .collection('links')
-            .orderBy('createdAt', descending: true)
             .get();
 
-    final links =
-        snapshot.docs.map((doc) {
-          final data = doc.data();
-          final date = (data['createdAt'] as Timestamp).toDate();
-          return {
-            'url': data['url'],
-            'memo': data['memo'],
-            'tags': List<String>.from(data['tags'] ?? []),
-            'date': DateFormat('yyyy-MM-dd').format(date),
-            'rawDate': date,
-          };
-        }).toList();
+    final grouped = <String, List<Map<String, dynamic>>>{};
+    for (var folderDoc in foldersSnapshot.docs) {
+      final folderName = folderDoc.id;
+      final linksSnapshot =
+          await folderDoc.reference
+              .collection('links')
+              .orderBy('createdAt', descending: true)
+              .get();
 
-    final Map<String, List<Map<String, dynamic>>> grouped = {};
-    for (var link in links) {
-      grouped.putIfAbsent(link['date'], () => []);
-      grouped[link['date']]!.add(link);
+      for (var doc in linksSnapshot.docs) {
+        final data = doc.data();
+        final ts = data['createdAt'] as Timestamp?;
+        final date = ts?.toDate() ?? DateTime.now();
+        final dateKey = DateFormat('yyyy-MM-dd').format(date);
+
+        final item = {
+          'lastAddedUrl': data['url'] as String? ?? '',
+          'lastMemo': data['memo'] as String? ?? '',
+          'lastTags':
+              (data['tags'] as List<dynamic>?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              <String>[],
+          'folder': folderName,
+          'createdAt': date,
+          'title': data['title'] as String? ?? '',
+          'docId': doc.id,
+          'name': folderName, // linkViewPage에서 'name' 필드 기대
+        };
+
+        grouped.putIfAbsent(dateKey, () => []).add(item);
+      }
     }
 
     setState(() {
@@ -67,12 +77,10 @@ class _LinkListByDatePageState extends State<LinkListByDatePage>
     final picked = await showDatePicker(
       context: context,
       initialDate: selectedDate ?? DateTime.now(),
-      firstDate: DateTime(2023),
+      firstDate: DateTime(2020),
       lastDate: DateTime.now(),
     );
-    if (picked != null) {
-      setState(() => selectedDate = picked);
-    }
+    if (picked != null) setState(() => selectedDate = picked);
   }
 
   @override
@@ -81,7 +89,7 @@ class _LinkListByDatePageState extends State<LinkListByDatePage>
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: Text('${widget.folderName} 링크 목록'),
+          title: const Text('전체 링크 목록'),
           bottom: const TabBar(
             tabs: [Tab(text: '날짜별 보기'), Tab(text: '선택 날짜 보기')],
           ),
@@ -90,30 +98,30 @@ class _LinkListByDatePageState extends State<LinkListByDatePage>
             isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : TabBarView(
-                  children: [
-                    _buildGroupedListView(), // A안
-                    _buildFilteredListView(), // B안
-                  ],
+                  children: [_buildGroupedListView(), _buildFilteredListView()],
                 ),
       ),
     );
   }
 
   Widget _buildGroupedListView() {
-    return ListView(
+    final entries =
+        groupedLinks.entries.toList()..sort((a, b) => b.key.compareTo(a.key));
+
+    return ListView.builder(
       padding: const EdgeInsets.all(16),
-      children:
-          groupedLinks.entries.map((entry) {
-            final date = entry.key;
-            final links = entry.value;
-            return ExpansionTile(
-              title: Text(
-                '📅 $date',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              children: links.map((link) => _buildLinkCard(link)).toList(),
-            );
-          }).toList(),
+      itemCount: entries.length,
+      itemBuilder: (_, i) {
+        final dateKey = entries[i].key;
+        final list = entries[i].value;
+        return ExpansionTile(
+          title: Text(
+            '📅 $dateKey (${list.length})',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          children: list.map(_buildRichLinkCard).toList(),
+        );
+      },
     );
   }
 
@@ -122,8 +130,7 @@ class _LinkListByDatePageState extends State<LinkListByDatePage>
         selectedDate != null
             ? DateFormat('yyyy-MM-dd').format(selectedDate!)
             : null;
-
-    final filteredLinks =
+    final list =
         dateKey != null && groupedLinks.containsKey(dateKey)
             ? groupedLinks[dateKey]!
             : [];
@@ -132,54 +139,125 @@ class _LinkListByDatePageState extends State<LinkListByDatePage>
       children: [
         Padding(
           padding: const EdgeInsets.all(16),
-          child: ElevatedButton.icon(
+          child: ActionChip(
             onPressed: _pickDate,
-            icon: const Icon(Icons.calendar_today),
+            avatar: const Icon(
+              Icons.calendar_today,
+              size: 20,
+              color: Colors.black,
+            ),
             label: Text(
-              selectedDate != null
-                  ? DateFormat('yyyy-MM-dd').format(selectedDate!)
-                  : '날짜 선택',
+              dateKey ?? '날짜 선택',
+              style: const TextStyle(color: Colors.black),
+            ),
+            backgroundColor: const Color(0xFFF0F0F0),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
             ),
           ),
         ),
-        if (selectedDate == null)
-          const Center(child: Text('날짜를 선택해주세요.'))
-        else if (filteredLinks.isEmpty)
-          const Center(child: Text('해당 날짜에 저장된 링크가 없습니다.'))
-        else
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children:
-                  filteredLinks.map((link) => _buildLinkCard(link)).toList(),
-            ),
-          ),
+        Expanded(
+          child:
+              list.isEmpty
+                  ? Center(
+                    child: Text(
+                      selectedDate == null ? '날짜를 선택해주세요.' : '해당 날짜에 링크가 없습니다.',
+                    ),
+                  )
+                  : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: list.length,
+                    itemBuilder: (_, idx) => _buildRichLinkCard(list[idx]),
+                  ),
+        ),
       ],
     );
   }
 
-  Widget _buildLinkCard(Map<String, dynamic> link) {
-    return Card(
-      child: ListTile(
-        title: Text(link['url']),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if ((link['memo'] as String).isNotEmpty) Text('📝 ${link['memo']}'),
-            if ((link['tags'] as List).isNotEmpty)
-              Wrap(
-                spacing: 6,
-                children:
-                    (link['tags'] as List)
-                        .map<Widget>(
-                          (tag) => Chip(
-                            label: Text(tag),
-                            backgroundColor: Colors.grey.shade200,
-                          ),
-                        )
-                        .toList(),
+  Widget _buildRichLinkCard(Map<String, dynamic> link) {
+    final raw = link['createdAt'] as DateTime;
+    final time = DateFormat('HH:mm').format(raw);
+    final tags = link['lastTags'] as List<String>;
+    final url = link['lastAddedUrl'] as String;
+
+    return GestureDetector(
+      onTap: () async {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => LinkViewPage(linkData: link)),
+        );
+        if (result == true) {
+          await _fetchAllLinks();
+        }
+      },
+      child: Card(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Image.network(
+                    'https://www.google.com/s2/favicons?sz=64&domain_url=$url',
+                    width: 24,
+                    height: 24,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.link),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      url,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.green,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                link['title'] as String,
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 6),
+              if ((link['lastMemo'] as String).isNotEmpty)
+                Text(
+                  link['lastMemo'] as String,
+                  style: const TextStyle(fontSize: 14),
+                ),
+              if (tags.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  children:
+                      tags
+                          .map(
+                            (t) => Chip(
+                              label: Text(t),
+                              backgroundColor: Colors.grey.shade200,
+                            ),
+                          )
+                          .toList(),
+                ),
+              ],
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '📂 ${link['folder']}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  Text(time, style: const TextStyle(fontSize: 12)),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

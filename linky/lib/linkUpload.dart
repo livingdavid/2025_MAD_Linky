@@ -17,7 +17,7 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 Future<String?> summarizeTextWithHuggingFace(String text) async {
   const apiUrl =
       'https://api-inference.huggingface.co/models/sshleifer/distilbart-cnn-12-6';
-  const apiToken = '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';
+  // const apiToken = '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';
 
   try {
     final shortened = text.length > 1000 ? text.substring(0, 1000) : text;
@@ -271,8 +271,6 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
             ),
             const SizedBox(height: 8),
             ElevatedButton.icon(
-              icon: const Icon(Icons.qr_code_scanner),
-              label: const Text("QR 코드로 링크 입력"),
               onPressed: () async {
                 final scanned = await Navigator.push(
                   context,
@@ -280,7 +278,22 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
                 );
                 if (scanned is String) linkController.text = scanned;
               },
+              icon: const Icon(Icons.qr_code_scanner, size: 20),
+              label: const Text('QR 코드로 링크 입력'),
+              style: ElevatedButton.styleFrom(
+                // backgroundColor: Theme.of(context).colorScheme.primary,
+                // foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 14,
+                  horizontal: 16,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 0,
+              ),
             ),
+
             const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -305,26 +318,34 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
                   final isSelected = folder == selectedFolder;
                   return GestureDetector(
                     onTap: () => setState(() => selectedFolder = folder),
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color:
-                            isSelected
-                                ? Colors.green.shade100
-                                : const Color(0xFFF0F0F0),
-                        borderRadius: BorderRadius.circular(12),
-                        border:
-                            isSelected
-                                ? Border.all(color: Colors.green, width: 2)
-                                : null,
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.folder, color: Colors.green),
-                          Text(folder, style: const TextStyle(fontSize: 12)),
-                        ],
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: AspectRatio(
+                        aspectRatio: 1.0, // 1:1 비율 = 정사각형
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color:
+                                isSelected
+                                    ? Colors.green.shade100
+                                    : const Color(0xFFF0F0F0),
+                            borderRadius: BorderRadius.circular(12),
+                            border:
+                                isSelected
+                                    ? Border.all(color: Colors.green, width: 2)
+                                    : null,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.folder, color: Colors.green),
+                              Text(
+                                folder,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   );
