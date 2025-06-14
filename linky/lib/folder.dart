@@ -56,6 +56,7 @@ class _FolderPageState extends State<FolderPage> {
             'tags': (data['tags'] as List<dynamic>?)?.join(',') ?? '',
             'createdAt': data['createdAt'] ?? Timestamp.now(),
             'docId': doc.id,
+            'imageUrl': data['imageUrl'] ?? '',
           };
         }).toList();
 
@@ -71,7 +72,6 @@ class _FolderPageState extends State<FolderPage> {
       RegExp.escape(query),
       caseSensitive: false,
     ).allMatches(source);
-
     if (matches.isEmpty) return TextSpan(text: source);
 
     final spans = <TextSpan>[];
@@ -208,123 +208,181 @@ class _FolderPageState extends State<FolderPage> {
                                   .map((e) => e.trim())
                                   .where((e) => e.isNotEmpty)
                                   .toList();
-
-                          return GestureDetector(
-                            onTap: () async {
-                              final result = await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder:
-                                      (_) => LinkViewPage(
-                                        linkData: {
-                                          'lastAddedUrl': link['url'] ?? '',
-                                          'lastTags': tagList,
-                                          'lastMemo': link['memo'] ?? '',
-                                          'createdAt':
-                                              link['createdAt'] ??
-                                              Timestamp.now(),
-                                          'title': link['title'] ?? '',
-                                          'name': selectedFolder,
-                                          'docId': link['docId'] ?? '',
-                                        },
-                                      ),
-                                ),
-                              );
-                              if (result == true) {
-                                await _loadLinks();
-                              }
-                            },
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 16),
-                              padding: const EdgeInsets.all(16),
+                          return Dismissible(
+                            key: ValueKey(link['docId']),
+                            direction: DismissDirection.endToStart,
+                            background: Container(
+                              margin: const EdgeInsets.symmetric(vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: Colors.red,
                                 borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Image.network(
-                                        'https://www.google.com/s2/favicons?sz=64&domain_url=${link['url'] ?? ''}',
-                                        width: 24,
-                                        height: 24,
-                                        errorBuilder:
-                                            (_, __, ___) =>
-                                                const Icon(Icons.link),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Flexible(
-                                        child: Text(
-                                          link['url'] ?? '제목 없음',
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.green,
-                                            fontWeight: FontWeight.bold,
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                              ),
+                              child: const Icon(
+                                Icons.delete,
+                                color: Colors.white,
+                              ),
+                            ),
+                            confirmDismiss: (direction) async {
+                              return await showDialog(
+                                context: context,
+                                builder:
+                                    (_) => AlertDialog(
+                                      title: const Text('삭제 확인'),
+                                      content: const Text('이 링크를 삭제하시겠습니까?'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed:
+                                              () => Navigator.of(
+                                                context,
+                                              ).pop(false),
+                                          child: const Text('취소'),
+                                        ),
+                                        TextButton(
+                                          onPressed:
+                                              () => Navigator.of(
+                                                context,
+                                              ).pop(true),
+                                          child: const Text('삭제'),
+                                        ),
+                                      ],
+                                    ),
+                              );
+                            },
+                            onDismissed: (_) async {
+                              final uid =
+                                  FirebaseAuth.instance.currentUser?.uid;
+                              if (uid == null) return;
+                              await FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(uid)
+                                  .collection('folders')
+                                  .doc(selectedFolder)
+                                  .collection('links')
+                                  .doc(link['docId'])
+                                  .delete();
+                              setState(
+                                () => folderData[selectedFolder]?.remove(link),
+                              );
+                            },
+                            child: GestureDetector(
+                              onTap: () async {
+                                final result = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (_) => LinkViewPage(
+                                          linkData: {
+                                            'lastAddedUrl': link['url'] ?? '',
+                                            'lastTags': tagList,
+                                            'lastMemo': link['memo'] ?? '',
+                                            'createdAt':
+                                                link['createdAt'] ??
+                                                Timestamp.now(),
+                                            'title': link['title'] ?? '',
+                                            'name': selectedFolder,
+                                            'docId': link['docId'] ?? '',
+                                            'imageUrl': link['imageUrl'] ?? '',
+                                          },
+                                        ),
+                                  ),
+                                );
+                                if (result == true) await _loadLinks();
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 16),
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.05),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Image.network(
+                                          'https://www.google.com/s2/favicons?sz=64&domain_url=${link['url'] ?? ''}',
+                                          width: 24,
+                                          height: 24,
+                                          errorBuilder:
+                                              (_, __, ___) =>
+                                                  const Icon(Icons.link),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Flexible(
+                                          child: Text(
+                                            link['url'] ?? '제목 없음',
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.green,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  RichText(
-                                    text: TextSpan(
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black,
-                                      ),
-                                      children: [
-                                        highlightQuery(
-                                          link['title'] ?? '',
-                                          searchQuery,
-                                        ),
                                       ],
                                     ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  RichText(
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    text: TextSpan(
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.grey,
-                                      ),
-                                      children: [
-                                        highlightQuery(
-                                          link['memo'] ?? '',
-                                          searchQuery,
+                                    const SizedBox(height: 12),
+                                    RichText(
+                                      text: TextSpan(
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black,
                                         ),
-                                      ],
+                                        children: [
+                                          highlightQuery(
+                                            link['title'] ?? '',
+                                            searchQuery,
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  if (tagList.isNotEmpty)
-                                    Wrap(
-                                      spacing: 8,
-                                      children:
-                                          tagList
-                                              .map(
-                                                (tag) => Chip(
-                                                  label: Text(tag),
-                                                  backgroundColor: const Color(
-                                                    0xFFF0F0F0,
+                                    const SizedBox(height: 6),
+                                    RichText(
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      text: TextSpan(
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey,
+                                        ),
+                                        children: [
+                                          highlightQuery(
+                                            link['memo'] ?? '',
+                                            searchQuery,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    if (tagList.isNotEmpty)
+                                      Wrap(
+                                        spacing: 8,
+                                        children:
+                                            tagList
+                                                .map(
+                                                  (tag) => Chip(
+                                                    label: Text(tag),
+                                                    backgroundColor:
+                                                        const Color(0xFFF0F0F0),
                                                   ),
-                                                ),
-                                              )
-                                              .toList(),
-                                    ),
-                                ],
+                                                )
+                                                .toList(),
+                                      ),
+                                  ],
+                                ),
                               ),
                             ),
                           );

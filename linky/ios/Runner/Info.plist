@@ -22,6 +22,10 @@
   <string>$(FLUTTER_BUILD_NAME)</string>
   <key>CFBundleSignature</key>
   <string>????</string>
+  <key>CFBundleVersion</key>
+  <string>$(FLUTTER_BUILD_NUMBER)</string>
+
+  <!-- ✅ URL 스킴 (Google 로그인 + 커스텀 스킴 포함) -->
   <key>CFBundleURLTypes</key>
   <array>
     <dict>
@@ -30,11 +34,11 @@
       <key>CFBundleURLSchemes</key>
       <array>
         <string>com.googleusercontent.apps.1087183332010-csn3cgh9s3gtn9om70dc2e752mllbbg1</string>
+        <string>linky</string>
       </array>
     </dict>
   </array>
-  <key>CFBundleVersion</key>
-  <string>$(FLUTTER_BUILD_NUMBER)</string>
+
   <key>FirebaseAppDelegateProxyEnabled</key>
   <false/>
   <key>LSRequiresIPhoneOS</key>
@@ -60,23 +64,13 @@
     <string>UIInterfaceOrientationLandscapeLeft</string>
     <string>UIInterfaceOrientationLandscapeRight</string>
   </array>
-<key>NSCameraUsageDescription</key>
-<string>QR 코드 스캔을 위해 카메라 접근이 필요합니다.</string>
-<key>NSPhotoLibraryUsageDescription</key>
-<string>사진 앨범에서 QR 코드를 가져오려면 접근이 필요합니다.</string>
-<key>CFBundleURLTypes</key>
-<array>
-  <dict>
-    <key>CFBundleTypeRole</key>
-    <string>Editor</string>
-    <key>CFBundleURLSchemes</key>
-    <array>
-      <string>linky</string>
-    </array>
-  </dict>
-</array>
 
-  <!-- ✅ 알림 관련 설정 추가 -->
+  <key>NSCameraUsageDescription</key>
+  <string>QR 코드 스캔을 위해 카메라 접근이 필요합니다.</string>
+  <key>NSPhotoLibraryUsageDescription</key>
+  <string>사진 앨범에서 QR 코드를 가져오려면 접근이 필요합니다.</string>
+
+  <!-- ✅ 알림 관련 설정 -->
   <key>UIBackgroundModes</key>
   <array>
     <string>fetch</string>
@@ -92,6 +86,5 @@
   <string>링크 리마인더 알림을 위해 접근 권한이 필요합니다.</string>
   <key>UIUserNotificationSettings</key>
   <string>YES</string>
-
 </dict>
 </plist>

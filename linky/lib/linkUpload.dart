@@ -17,7 +17,7 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 Future<String?> summarizeTextWithHuggingFace(String text) async {
   const apiUrl =
       'https://api-inference.huggingface.co/models/sshleifer/distilbart-cnn-12-6';
-  // const apiToken = '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';
+  const apiToken = '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';
 
   try {
     final shortened = text.length > 1000 ? text.substring(0, 1000) : text;
@@ -45,6 +45,7 @@ Future<String?> summarizeTextWithHuggingFace(String text) async {
 }
 
 String? extractedTitle;
+String? extractedImageUrl; // ✅ 추가
 
 Future<String?> extractTextFromUrl(String url) async {
   final extractUrl = 'https://api.microlink.io/?url=$url';
@@ -57,7 +58,10 @@ Future<String?> extractTextFromUrl(String url) async {
       final title = data['title'] ?? '';
       final description = data['description'] ?? '';
       final content = data['content'] ?? '';
+      final imageUrl = data['image']?['url'] ?? ''; // ✅ 추가
+
       extractedTitle = title;
+      extractedImageUrl = imageUrl; // ✅ 추가
 
       final combined = [
         title,
@@ -102,17 +106,47 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
     _loadFolders();
     _initNotifications();
 
+    bool containsKorean(String text) {
+      final koreanRegex = RegExp(r'[가-힣]');
+      return koreanRegex.hasMatch(text);
+    }
+
     linkController.addListener(() async {
       final url = linkController.text.trim();
       if (!url.startsWith('http')) return;
 
-      final extractedText = await extractTextFromUrl(url);
-      if (extractedText == null || extractedText.length < 30) return;
+      debugPrint('🟡 URL 감지됨: $url');
 
-      final summary = await summarizeTextWithHuggingFace(extractedText);
+      final extractedText = await extractTextFromUrl(url);
+      debugPrint('📄 추출된 텍스트 길이: ${extractedText?.length}');
+
+      if (extractedText == null || extractedText.length < 30) {
+        debugPrint('⚠️ 추출된 텍스트가 너무 짧아서 요약 생략');
+        return;
+      }
+
+      // ✅ 한국어 포함 시 요약 생략
+      if (containsKorean(extractedText)) {
+        debugPrint('🛑 한국어 포함되어 있어 요약 생략');
+        return;
+      }
+
+      final trimmed =
+          extractedText.length > 1000
+              ? extractedText.substring(0, 1000)
+              : extractedText;
+
+      final summary = await summarizeTextWithHuggingFace(trimmed);
+      debugPrint('📝 요약 결과: $summary');
+
       if (summary != null && mounted) {
         memoController.text = summary;
         setState(() {});
+        debugPrint('✅ 메모에 요약 적용됨');
+      } else {
+        memoController.text = '⚠️ 요약 실패: 내용을 직접 입력해 주세요.';
+        setState(() {});
+        debugPrint('❌ 요약 실패, fallback 메모 표시');
       }
     });
   }
@@ -176,6 +210,7 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
       'url': url,
       'title': title,
       'memo': memoController.text.trim(),
+      'imageUrl': extractedImageUrl ?? '',
       'tags': tags,
       'createdAt': FieldValue.serverTimestamp(),
     });
@@ -357,13 +392,24 @@ class _LinkUploadPageState extends State<LinkUploadPage> {
             Wrap(
               spacing: 8,
               children: [
-                ...tags.map((tag) => Chip(label: Text(tag))),
+                ...tags.map(
+                  (tag) => Chip(
+                    label: Text(tag),
+                    deleteIcon: const Icon(Icons.close),
+                    onDeleted: () {
+                      setState(() {
+                        tags.remove(tag); // ✅ 삭제 동작
+                      });
+                    },
+                  ),
+                ),
                 ActionChip(
                   label: const Text('+ 태그 추가'),
                   onPressed: _showAddTagModal,
                 ),
               ],
             ),
+
             const SizedBox(height: 24),
             const Text('메모', style: TextStyle(fontWeight: FontWeight.bold)),
             TextField(

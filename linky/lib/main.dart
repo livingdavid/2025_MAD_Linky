@@ -6,6 +6,7 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:shared_preference_app_group/shared_preference_app_group.dart';
 import 'auth_gate.dart';
 import 'linkUpload.dart'; // LinkUploadPage 선언부 import
+import 'login.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -128,6 +129,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       title: 'Linky',
       debugShowCheckedModeBanner: false,
       home: AuthGate(initialLink: widget.initialLink),
+      routes: {
+        '/login': (context) => const LoginPage(), // ✅ 이거 추가
+      },
     );
   }
 }

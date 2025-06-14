@@ -6,9 +6,11 @@ import 'modals/addTag.dart';
 import 'modals/createFolder.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+// 1. 먼저 StatefulWidget 정의
 class LinkUpdatePage extends StatefulWidget {
   final Map<String, dynamic> linkData;
-  const LinkUpdatePage({super.key, required this.linkData});
+
+  const LinkUpdatePage({Key? key, required this.linkData}) : super(key: key);
 
   @override
   State<LinkUpdatePage> createState() => _LinkUpdatePageState();
